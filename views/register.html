@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <link rel="stylesheet" href="/register.style.css">
+</head>
+<body>
+    <div class="container">
+    <h2>Register</h2>
+    <form id="registerForm">
+        <label for="username">Username: </label>
+        <input type="text" id="username" name="username" required><br><br>
+        
+        <label for="password">Password: </label>
+        <input type="password" id="password" name="password" required><br><br>
+
+        <button type="submit">Register</button>
+    </form>
+</div>
+
+    <div id="notificationPopup" class="notification-popup">
+        <!-- Message will be dynamically inserted here -->
+    </div>
+
+    <script>
+
+        //Register
+        document.getElementById('registerForm').addEventListener('submit', async function(event){
+            event.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try{
+                const response =  await fetch('/api/auth/register',{
+                    method:'POST',
+                    headers: {
+                        'Content-Type':'application/json',
+                    },
+                    body: JSON.stringify({username,password}),
+                });
+                const data  = await response.json();
+                if(response.ok){
+                    // Register Successful
+                    showMessage(data.message);
+                    window.location.pathname = '/login';
+                    
+                } else {
+                    showMessage(data.error,true);
+                }
+            } catch(error){
+               
+                showMessage('An error occured. Please try again later.',true);
+               }
+        });
+
+         // message popup
+         function showMessage(message, isError = false){
+            const popup = document.getElementById('notificationPopup');
+            popup.textContent = message;
+            popup.className = 'notification-popup';
+
+            if (isError){
+                popup.classList.add('error');
+            }
+
+            popup.style.display ='block';
+            setTimeout(() =>{
+                popup.style.display = 'none';
+            },3000);
+        }
+
+    </script>
+</body>
+</html>

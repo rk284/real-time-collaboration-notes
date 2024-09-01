@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/home.style.css">
+</head>
+<body>
+    <div class="navbar">
+        <a href="/home" class="active">Home</a>
+        <a href="/notes">View all Notes</a>
+        <a id="logout">Logout</a>
+        <a id="collaborate">Real Time collaboration</a>
+    </div>
+
+    <div class="container">
+        
+        <h2>Create your notes here!</h2>
+        <form id="createNotes">
+        <input type="text" id="title" placeholder="Enter title to your notes.." required> <br><br>
+        <textarea class="textfield" id="content" placeholder="Start writing..." required></textarea><br>
+        <button type="submit">Save your notes</button>
+    </form>
+    </div>
+
+    
+    <div id="notificationPopup" class="notification-popup">
+        <!-- Message will be dynamically inserted here -->
+    </div>
+    <div id="notifications" class="notifications" >
+        <!-- Notifications of collaboration will be loaded here -->
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+
+        // Logout
+        document.getElementById('logout').addEventListener('click', async function(event){
+            event.preventDefault();
+            
+            try{
+            const response = await fetch('/api/auth/logout',{
+                method:'POST',
+            });
+
+            const data  = await response.json();
+
+            if(response.ok){
+                showMessage(data.message);
+                window.location.pathname = '/login';
+            } else {
+                showMessage(data.error,true);
+               
+            }
+           } catch(error){
+            showMessage('An error occured. Please try again later.',true);
+
+           }
+        });
+
+        //Save notes
+
+        document.getElementById('createNotes').addEventListener('submit', async function(event) {
+
+            event.preventDefault();
+
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+
+            try{
+                const response = await fetch('/api/crud/create/notes',{
+                    method:'POST',
+                    headers:{
+                        'Content-Type':'application/json',
+                    },
+                    body: JSON.stringify({title,content}),
+                });
+
+                const data  = await response.json();
+
+                if(response.ok){
+                    showMessage(data.message);
+                    
+                    document.getElementById('title').value = '';
+                    document.getElementById('content').value = '';
+                }
+                else{
+                    showMessage(data.error,true);
+                   
+                }
+
+            } catch(error){
+                showMessage('An error occured. Please try again later.',true);
+            }
+            
+        });
+
+        // message popup
+        function showMessage(message, isError = false){
+            const popup = document.getElementById('notificationPopup');
+            popup.textContent = message;
+            popup.className = 'notification-popup';
+
+            if (isError){
+                popup.classList.add('error');
+            }
+
+            popup.style.display ='block';
+            setTimeout(() =>{
+                popup.style.display = 'none';
+            },3000);
+        }
+
+
+       // Collaboration request
+       document.getElementById('collaborate').addEventListener('click', async function (event){
+      
+            event.preventDefault();
+
+            const username = prompt('Enter the username of the user you want to collaborate with:');
+            if(username){
+                try{
+                    const response = await fetch('/api/collaboration/request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body:JSON.stringify({username})
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        showMessage(data.message);   
+                       
+                        
+                    } else {
+                        showMessage(data.error,true);   
+                        
+                    }
+                } catch (error) {
+                    showMessage('An error occured. Please try again later.',true);   
+                }
+
+                
+            }
+            
+        });
+
+        // Collaboration notification
+        let userId;
+        async function loadData() {
+            try {
+                const response = await fetch('/api/auth/user/details');
+                const data = await response.json();
+                if (response.ok) {
+                    userId = data.userId;
+                }
+                else{
+                    showMessage(data.error, true);
+                }
+            } catch(error){
+                showMessage(data.error, true);
+            }
+       
+        
+              try{
+       
+
+        const socket = io();
+        
+        socket.emit('join',{userId: userId});
+        
+        socket.on('collaboration',(data) =>{
+            const notifications = document.getElementById('notifications');
+            const div = document.createElement('div');
+            div.innerHTML = `<p> You have an collaboration invite from ${data.senderUsername}. </p>
+                             <button onclick="acceptInvite('${data.inviteId}')">Accept</button>
+                             <button onclick="declineInvite('${data.inviteId}')">Decline</button>`;
+            notifications.appendChild(div);
+            notifications.classList.add('show-popup');
+            notifications.style.display = 'block';
+        });
+
+        //if receiver accept the request
+               
+
+                socket.on('accepted',(data)=>{
+                     showMessage('Request is accepted');
+                     window.location.href = `/collaborate/${data.sessionId}`;
+                });
+
+         //if receiver decline the request
+
+                socket.on('declined',(data)=>{
+                     showMessage('Request is declined',true);
+                });
+            } catch(error){
+                showMessage('An error occured. Please try again later.', true);
+
+            }
+   
+        };
+
+        //Accept function
+        async function acceptInvite(inviteId) {
+            document.getElementById('notifications').classList.remove('show-popup');
+            try{
+            const response = await fetch(`/api/collaboration/invites/${inviteId}/accept`,{
+                method:'POST'
+            });
+            const data  = await response.json();
+
+                if(response.ok){
+                         window.location.href = `/collaborate/${data.sessionId}`;
+
+                }
+                else{
+                    showMessage(data.error, true);
+                }
+            } catch(error){
+                showMessage('An error occured. Please try again later.', true);
+            }
+
+            }
+        
+
+            //Decline function
+            async function declineInvite(inviteId) {
+                document.getElementById('notifications').classList.remove('show-popup');
+            try{
+            const response = await fetch(`/api/collaboration/invites/${inviteId}/decline`,{
+                method:'POST'
+            });
+            const data  = await response.json();
+
+                if(response.ok){
+                        location.reload();
+
+                }
+                else{
+                    showMessage(data.error, true);
+                }
+            } catch(error){
+                showMessage('An error occured. Please try again later.', true);
+            }
+
+            }
+
+            window.onload = loadData;
+
+
+
+
+    </script>
+</body>
+</html>

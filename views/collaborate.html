@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Time Collaboration</title>
+    <link rel="stylesheet" href="/collaborate.style.css">
+</head>
+<body>
+
+    <div class="container">
+        
+        <h2>Collaborate on your notes here!</h2>
+        <form id="collaborateForm" class="collab-area" >
+       
+        <textarea class="textfield" id="content" placeholder="Start writing..." required></textarea><br>
+        <button id="endSession" class="close-collaboration">End collaboration</button>
+    </form>
+    </div>
+    <div id="notificationPopup" class="notification-popup">
+        <!-- Message will be dynamically inserted here -->
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+
+    
+       
+
+        try{
+     
+        const socket = io();
+
+        const sessionId = window.location.pathname.split('/').pop();
+        
+    
+        // Join session
+        socket.emit('joinSession', {sessionId});
+
+        //listen updates on notes
+        socket.on('updateNotesDetails',(data) =>{
+           
+            document.getElementById('content').value = data.details;
+           
+        });
+
+
+        //listen session end
+        socket.on('sessionEnded',()=>{
+            alert('Collaboration session has ended');
+            window.location.href = '/home';
+        });
+
+        //Update note in real time
+        document.getElementById('content').addEventListener('input',function() {
+          
+            const sessionId = window.location.pathname.split('/').pop();
+           
+            const details = this.value;
+           
+            const data = { sessionId: sessionId,details: details};
+            socket.emit('updateNotes',{data});
+        });
+
+      
+
+        //End the session
+        document.getElementById('endSession').addEventListener('click',async ()=>{
+            await updateNote(event);
+            socket.emit('endSession',{sessionId});
+            window.location.href = '/home';
+        });
+        
+    } catch(error){
+        showMessage('An error occured. Please try again later.',true);
+    }
+     
+
+
+
+        //save note in db
+        async function updateNote(event) {
+
+            event.preventDefault();
+            let noteId;
+            try { 
+                const sessionId = window.location.pathname.split('/').pop();
+        
+                const response = await fetch(`/api/collaboration/session/note/${sessionId}`);
+                const data = await response.json();
+                if (response.ok) {
+                    noteId = data.noteId;
+                  
+                }
+                else{
+                    showMessage(data.error, true);
+                }
+            } catch(error){
+                showMessage("An error occured. Please try again later.", true);
+            }
+           
+
+            const title = prompt("Enter the title to your notes.");
+            const content = document.getElementById('content').value;
+
+            try{
+                 const response = await fetch(`/api/crud/update/${noteId}`,{
+                      method:'PUT',
+                      headers:{
+                     'Content-Type':'application/json',
+                         },
+                     body: JSON.stringify({title,content}),
+              });
+
+         const data = await response.json();
+
+         if(response.ok){
+             showMessage(data.message); 
+
+             }
+         else{
+             showMessage(data.error,true); 
+          }
+
+            } catch(error){
+                 showMessage('An error occured. Please try again later.',true);
+                }
+
+            }
+
+
+
+
+         // message popup
+         function showMessage(message, isError = false){
+            const popup = document.getElementById('notificationPopup');
+            popup.textContent = message;
+            popup.className = 'notification-popup';
+
+            if (isError){
+                popup.classList.add('error');
+            }
+
+            popup.style.display ='block';
+            setTimeout(() =>{
+                popup.style.display = 'none';
+            },3000);
+        }
+
+
+  
+
+    </script>
+    
+</body>
+</html>
